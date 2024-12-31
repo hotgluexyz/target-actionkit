@@ -99,3 +99,23 @@ class ContactsSink(ActionKitSink):
                 break
 
         return payload
+
+    def postprocess_record(self, record: dict, context: dict) -> dict:
+        if not self.config.get("page_name"):
+            return record
+        email = record.get("email")
+        if not email:
+            return record
+        response = self.request_api(
+            "POST",
+            endpoint="rest/v1/action",
+            request_data={
+                "page": self.config.get("page_name"),
+                "email": email
+            },
+            headers=self.prepare_request_headers()
+        )
+        if response.ok:
+            self.logger.info(f"Action created for {email} on {self.config.get('page_name')}")
+            return record
+        raise Exception(f"Failed to create action for {email} on {self.config.get('page_name')}: {response.text}")

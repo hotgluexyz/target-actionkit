@@ -34,6 +34,7 @@ class TargetActionKit(TargetHotglue):
         th.Property("username", th.StringType, required=True),
         th.Property("password", th.StringType, required=True),
         th.Property("hostname", th.StringType, required=True),
+        th.Property("page_name", th.StringType),
     ).to_dict()
 
 
