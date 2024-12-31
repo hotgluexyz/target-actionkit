@@ -7,7 +7,7 @@ class ContactsSink(ActionKitSink):
     """ActionKit target sink class."""
 
     name = "Contacts"
-    endpoint = "user"
+    endpoint = "rest/v1/"
     entity = "user"
 
     def add_phone_numbers(self, user_id: str, record: dict):
@@ -49,6 +49,9 @@ class ContactsSink(ActionKitSink):
             
             if existing_users:
                 user_id = existing_users[0].get("id")
+                # TODO:I got {"errors": {"zip": ["Data too long! Please use a smaller value, see the schema for the maximum allowed input"]}}}
+                # I'm not sure if this is the correct way to handle this, but it's a temporary fix
+                record.pop("zip", None)
                 response = self.request_api(
                     "PATCH",
                     request_data=record,
@@ -59,7 +62,8 @@ class ContactsSink(ActionKitSink):
                 if response.ok:
                     self.add_phone_numbers(user_id, record)
                     state_dict["success"] = True
-                    state_dict["is_updated"] = True
+                    state_dict["is_updated"] = True            
+                    self.postprocess_record(record, context)
                     return user_id, response.ok, state_dict
         
         response = self.request_api(
@@ -74,6 +78,7 @@ class ContactsSink(ActionKitSink):
             id = response.headers['Location'].replace(f"https://{self.config.get('hostname')}.actionkit.com/rest/v1/user/", "")[:-1]
             self.logger.info(id)
             self.add_phone_numbers(id, record)
+            self.postprocess_record(record, context)
             return id, response.ok, state_dict
         
         return None, False, state_dict
@@ -106,16 +111,21 @@ class ContactsSink(ActionKitSink):
         email = record.get("email")
         if not email:
             return record
-        response = self.request_api(
-            "POST",
-            endpoint="rest/v1/action",
-            request_data={
+        try:
+            response = self.request_api(
+                "POST",
+                endpoint="action",
+                request_data={
                 "page": self.config.get("page_name"),
                 "email": email
             },
             headers=self.prepare_request_headers()
-        )
-        if response.ok:
-            self.logger.info(f"Action created for {email} on {self.config.get('page_name')}")
+            )
+            if response.ok:
+                self.logger.info(f"Action created for {response.json().get('user')} on {self.config.get('page_name')}")
+                return record
+            else:
+                raise Exception(f"Failed to create action for {email} on {self.config.get('page_name')}: {response.text}")
+        except Exception as e:
+            self.logger.error(f"Failed to create action for {email} on {self.config.get('page_name')}: {e}")
             return record
-        raise Exception(f"Failed to create action for {email} on {self.config.get('page_name')}: {response.text}")
