@@ -23,6 +23,9 @@ class ActionKitSink(HotglueSink):
 
     @property
     def base_url(self):
+        if self.config.get('full_url'):
+            return f"{self.config.get('full_url')}/rest/v1/"
+            
         return f"https://{self.config.get('hostname')}.actionkit.com/rest/v1/"
 
     def validate_response(self, response: requests.Response) -> None:
