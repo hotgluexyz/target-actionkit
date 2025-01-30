@@ -33,7 +33,7 @@ class TargetActionKit(TargetHotglue):
     config_jsonschema = th.PropertiesList(
         th.Property("username", th.StringType, required=True),
         th.Property("password", th.StringType, required=True),
-        th.Property("hostname", th.StringType, required=True),
+        th.Property("hostname", th.StringType, required=False),
     ).to_dict()
 
 
