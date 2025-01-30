@@ -71,7 +71,7 @@ class ContactsSink(ActionKitSink):
         
         if response.ok:
             state_dict["success"] = True
-            id = response.headers['Location'].replace(f"https://{self.config.get('hostname')}.actionkit.com/rest/v1/user/", "")[:-1]
+            id = response.headers['Location'].replace(f"{self.base_url}user/", "")[:-1]
             self.logger.info(id)
             self.add_phone_numbers(id, record)
             return id, response.ok, state_dict
