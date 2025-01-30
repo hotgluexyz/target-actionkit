@@ -41,7 +41,8 @@ class ContactsSink(ActionKitSink):
         if record.get("email"):
             search_response = self.request_api(
                 "GET",
-                endpoint=f"user/?email={record['email']}",
+                endpoint="user",
+                params = {"email": record['email']},
                 headers=self.prepare_request_headers()
             )
             
