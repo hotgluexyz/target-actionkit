@@ -60,29 +60,31 @@ class ContactsSink(ActionKitSink):
                 subscribed_list_ids.append(response.json()["id"])
 
         return subscribed_list_ids
-    
-    def add_lists(self, user_email: str, lists: list = None):
-        if lists and isinstance(lists, list):
-            self.logger.info(f"add lists to user: {user_email}. lists: {lists}")
-            return self.request_api(
-                "POST",
-                request_data={
-                    "email": user_email,
-                    "page": "signup",
-                    "lists": lists
-                },
-                endpoint="action",
-                headers=self.prepare_request_headers()
-            )
+
+    def post_signup_action(self, user_email: str, lists: list = None):
+        
+        self.logger.info(f"Signup user: {user_email}. lists: {lists}")
+        resp =  self.request_api(
+            "POST",
+            request_data={
+                "email": user_email,
+                "page": self.signup_page_short_name,
+                "lists": lists,
+            },
+            endpoint="action",
+            headers=self.prepare_request_headers()
+        )
+        self.logger.info(f"Signup result: {resp.status_code}")
+        return resp
     
     def remove_lists(self, user_email: str, lists: list = None):
         if lists and isinstance(lists, list):
-            self.logger.info(f"add lists to user: {user_email}. lists: {lists}")
+            self.logger.info(f"Unsubscribe: {user_email} from lists: {lists}")
             return self.request_api(
                 "POST",
                 request_data={
                     "email": user_email,
-                    "page": "unsubscribe",
+                    "page": self.unsubscribe_page_short_name,
                     "lists": lists
                 },
                 endpoint="action",
@@ -112,50 +114,57 @@ class ContactsSink(ActionKitSink):
         if record.get("email"):
             if record.get("error"):
                 raise Exception(record.get("error"))
-            search_response = self.request_api(
-                "GET",
-                endpoint="user",
-                params = {"email": record['email']},
+            
+            self.logger.info(f"Upserting user: {record.get('email')}")
+
+            subscribe_status = record.pop("subscribe_status") if "subscribe_status" in record else None
+            intended_unsubscribe = subscribe_status == "unsubscribed"
+            
+            self.logger.info(f"Intended unsubscribe: {intended_unsubscribe}")
+            
+            lists = record.get("lists")
+
+
+            # Unsubscribe user from all lists because API does not support unsubscribing from single lists
+            if intended_unsubscribe:
+                self.remove_lists(record["email"], lists)
+
+            # Create user if not exists (Also subscribe to lists)
+            # If the target just removed a list still in the record, it will be re-added
+            list_response = self.post_signup_action(record["email"], lists)
+
+            is_created = list_response.json().get("created_user")
+            user_id = list_response.json().get("user").split("/")[-2]
+
+            # Update non-email fields
+            response = self.request_api(
+                "PATCH",
+                request_data=record,
+                endpoint=f"user/{user_id}",
                 headers=self.prepare_request_headers()
             )
-            
-            existing_users = search_response.json().get("objects", [])
-            subscription_status = record.pop("subscription_status")
-            
-            if existing_users:
-                user_id = existing_users[0].get("id")
-                subscribed_lists = self.get_subscribed_lists(user_id)
-                lists = record.get("lists", [])
-                to_subscribe = list(set(lists) - set(subscribed_lists))
-                self.add_lists(record["email"], to_subscribe)
-                if subscription_status == "unsubscribed":
-                    to_unsubscribe = list(set(subscribed_lists) - set(lists))
-                    self.remove_lists(record["email"], to_unsubscribe)
-                response = self.request_api(
-                    "PATCH",
-                    request_data=record,
-                    endpoint=f"user/{user_id}",
-                    headers=self.prepare_request_headers()
-                )
                 
-                if response.ok:
-                    self.add_phone_numbers(user_id, record)
-                    state_dict["success"] = True
-                    state_dict["is_updated"] = True
-                    return user_id, response.ok, state_dict
+            if response.ok:
+                self.add_phone_numbers(user_id, record)
+                state_dict["success"] = True
+                state_dict["is_updated"] = not is_created
+                return user_id, response.ok, state_dict
         
+
+
+        # Record lacks email or cannot create via signup page    
+        self.logger.info(f"Creating user via POST: {record.get('email')}")    
         response = self.request_api(
             "POST",
             request_data=record,
             endpoint="user",
             headers=self.prepare_request_headers()
         )
+        self.logger.info(response.status_code)
         
         if response.ok:
             state_dict["success"] = True
-            id = response.headers['Location'].replace(f"{self.base_url}user/", "")[:-1]
-            self.logger.info(id)
-            self.add_lists(record["email"], record.get("lists"))
+            id = user_id if user_id else response.headers['Location'].replace(f"{self.base_url}user/", "")[:-1]
             self.add_phone_numbers(id, record)
             return id, response.ok, state_dict
         
@@ -166,7 +175,7 @@ class ContactsSink(ActionKitSink):
             "first_name": record.get("first_name"),
             "last_name": record.get("last_name"),
             "email": record.get("email"),
-            "subscription_status": record.get("subscription_status"),
+            "subscribe_status": record.get("subscribe_status"),
         }
         if "addresses" in record and isinstance(record["addresses"], list):
             for address in record["addresses"]:

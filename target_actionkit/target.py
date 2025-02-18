@@ -34,6 +34,8 @@ class TargetActionKit(TargetHotglue):
         th.Property("username", th.StringType, required=True),
         th.Property("password", th.StringType, required=True),
         th.Property("hostname", th.StringType, required=False),
+        th.Property("signup_page_short_name", th.StringType, required=True),
+        th.Property("unsubscribe_page_short_name", th.StringType, required=False),
     ).to_dict()
 
 
