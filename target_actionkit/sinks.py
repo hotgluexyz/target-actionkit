@@ -77,19 +77,18 @@ class ContactsSink(ActionKitSink):
         self.logger.info(f"Signup result: {resp.status_code}")
         return resp
     
-    def remove_lists(self, user_email: str, lists: list = None):
-        if lists and isinstance(lists, list):
-            self.logger.info(f"Unsubscribe: {user_email} from lists: {lists}")
-            return self.request_api(
-                "POST",
-                request_data={
-                    "email": user_email,
-                    "page": self.unsubscribe_page_short_name,
-                    "lists": lists
-                },
-                endpoint="action",
-                headers=self.prepare_request_headers()
-            )
+    def remove_lists(self, user_email: str):
+        
+        self.logger.info(f"Unsubscribe: {user_email} all lists.")
+        return self.request_api(
+            "POST",
+            request_data={
+                "email": user_email,
+                "page": self.unsubscribe_page_short_name,
+            },
+            endpoint="action",
+            headers=self.prepare_request_headers()
+        )
     
     def create_list(self, list_name: str):
         if list_name and isinstance(list_name, str):
@@ -121,19 +120,34 @@ class ContactsSink(ActionKitSink):
 
         subscribe_status = record.pop("subscribe_status") if "subscribe_status" in record else None
         intended_unsubscribe = subscribe_status == "unsubscribed"
-        
-        self.logger.info(f"Intended unsubscribe: {intended_unsubscribe}")
+        intended_subscribe = subscribe_status == "subscribed"
         
         lists = record.get("lists")
 
 
         # Unsubscribe user from all lists because API does not support unsubscribing from single lists
         if intended_unsubscribe:
-            self.remove_lists(record["email"], lists)
-
-        # Create user if not exists (Also subscribe to lists)
-        # If the target just removed a list still in the record, it will be re-added
-        list_response = self.post_signup_action(record["email"], lists)
+            search_response = self.request_api(
+                "GET",
+                endpoint="user",
+                params = {"email": record['email']},
+                headers=self.prepare_request_headers()
+            )
+            
+            existing_users = search_response.json().get("objects", [])
+            if existing_users:
+                currently_subscribed_lists = self.get_subscribed_lists(existing_users[0].get("id"))
+                self.remove_lists(record["email"])
+                lists_to_subscribe = [l for l in currently_subscribed_lists if l not in lists]
+                list_response = self.post_signup_action(record["email"], lists_to_subscribe)
+            else:
+                # Create user from scratch
+                list_response = self.post_signup_action(record["email"], [])
+        elif intended_subscribe:
+            list_response = self.post_signup_action(record["email"], lists)
+        else:
+            # Create if not exists without lists
+            list_response = self.post_signup_action(record["email"])
 
         is_created = list_response.json().get("created_user")
         user_id = list_response.json().get("user").split("/")[-2]
