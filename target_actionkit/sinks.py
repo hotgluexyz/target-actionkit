@@ -110,64 +110,47 @@ class ContactsSink(ActionKitSink):
 
     def upsert_record(self, record: dict, context: dict):
         state_dict = dict()
+        # Email is a required field for ActionKit
+        if not record.get("email"):
+            raise Exception("Email is a required field for ActionKit")
 
-        if record.get("email"):
-            if record.get("error"):
-                raise Exception(record.get("error"))
-            
-            self.logger.info(f"Upserting user: {record.get('email')}")
-
-            subscribe_status = record.pop("subscribe_status") if "subscribe_status" in record else None
-            intended_unsubscribe = subscribe_status == "unsubscribed"
-            
-            self.logger.info(f"Intended unsubscribe: {intended_unsubscribe}")
-            
-            lists = record.get("lists")
-
-
-            # Unsubscribe user from all lists because API does not support unsubscribing from single lists
-            if intended_unsubscribe:
-                self.remove_lists(record["email"], lists)
-
-            # Create user if not exists (Also subscribe to lists)
-            # If the target just removed a list still in the record, it will be re-added
-            list_response = self.post_signup_action(record["email"], lists)
-
-            is_created = list_response.json().get("created_user")
-            user_id = list_response.json().get("user").split("/")[-2]
-
-            # Update non-email fields
-            response = self.request_api(
-                "PATCH",
-                request_data=record,
-                endpoint=f"user/{user_id}",
-                headers=self.prepare_request_headers()
-            )
-                
-            if response.ok:
-                self.add_phone_numbers(user_id, record)
-                state_dict["success"] = True
-                state_dict["is_updated"] = not is_created
-                return user_id, response.ok, state_dict
+        if record.get("error"):
+            raise Exception(record.get("error"))
         
+        self.logger.info(f"Upserting user: {record.get('email')}")
+
+        subscribe_status = record.pop("subscribe_status") if "subscribe_status" in record else None
+        intended_unsubscribe = subscribe_status == "unsubscribed"
+        
+        self.logger.info(f"Intended unsubscribe: {intended_unsubscribe}")
+        
+        lists = record.get("lists")
 
 
-        # Record lacks email or cannot create via signup page    
-        self.logger.info(f"Creating user via POST: {record.get('email')}")    
+        # Unsubscribe user from all lists because API does not support unsubscribing from single lists
+        if intended_unsubscribe:
+            self.remove_lists(record["email"], lists)
+
+        # Create user if not exists (Also subscribe to lists)
+        # If the target just removed a list still in the record, it will be re-added
+        list_response = self.post_signup_action(record["email"], lists)
+
+        is_created = list_response.json().get("created_user")
+        user_id = list_response.json().get("user").split("/")[-2]
+
+        # Update non-email fields
         response = self.request_api(
-            "POST",
+            "PATCH",
             request_data=record,
-            endpoint="user",
+            endpoint=f"user/{user_id}",
             headers=self.prepare_request_headers()
         )
-        self.logger.info(response.status_code)
-        
         if response.ok:
+            self.add_phone_numbers(user_id, record)
             state_dict["success"] = True
-            id = user_id if user_id else response.headers['Location'].replace(f"{self.base_url}user/", "")[:-1]
-            self.add_phone_numbers(id, record)
-            return id, response.ok, state_dict
-        
+            state_dict["is_updated"] = not is_created
+            return user_id, response.ok, state_dict
+                
         return None, False, state_dict
 
     def preprocess_record(self, record: dict, context: dict) -> dict:
