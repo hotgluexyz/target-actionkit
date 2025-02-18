@@ -29,6 +29,14 @@ class ActionKitSink(HotglueSink):
             return f"{self.config.get('full_url')}/rest/v1/"
             
         return f"https://{self.config.get('hostname')}.actionkit.com/rest/v1/"
+    
+    @property
+    def signup_page_short_name(self):
+        return self.config.get('signup_page_short_name')
+    
+    @property
+    def unsubscribe_page_short_name(self):
+        return self.config.get('unsubscribe_page_short_name')
 
     def validate_response(self, response: requests.Response) -> None:
         """Validate HTTP response."""
