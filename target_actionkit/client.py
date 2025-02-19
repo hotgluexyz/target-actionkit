@@ -66,10 +66,12 @@ class ActionKitSink(HotglueSink):
         list_url = f"list/"
         params = "?_limit=100"
         next_url = f"{list_url}{params}"
+        self.logger.info(f"Fetching lists from {self.base_url}{next_url}")
 
         while next_url:
             response = self.request_api("GET", endpoint=next_url, headers=self.prepare_request_headers())
             response_data = response.json()
+            self.logger.info(f"Response: {response_data}")
             self.lists.extend(response_data.get("objects", []))
             params: str = response_data.get("meta", {}).get("next", "")
             if params:
