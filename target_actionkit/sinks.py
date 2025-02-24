@@ -1,7 +1,12 @@
 """ActionKit target sink class, which handles writing streams."""
 
+
+import os
+import json
+
 from target_actionkit.client import ActionKitSink
 
+__location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
 class ContactsSink(ActionKitSink):
     """ActionKit target sink class."""
@@ -167,6 +172,19 @@ class ContactsSink(ActionKitSink):
                 
         return None, False, state_dict
 
+    def load_json_data(self, filename):
+        file_path = os.path.join(__location__, filename)
+        with open(file_path, "r") as file_to_read:
+            return json.load(file_to_read)
+
+    def transform_country_code(self, country_code):
+        if not country_code:
+            return None
+
+        countries = self.load_json_data("countries.json")
+        
+        return countries.get(country_code, country_code)
+
     def preprocess_record(self, record: dict, context: dict) -> dict:
         payload = {
             "first_name": record.get("first_name"),
@@ -187,7 +205,7 @@ class ContactsSink(ActionKitSink):
                     "region": address.get("state"),
                     "postal": postal_code,
                     "zip": zip_code,
-                    "country": address.get("country")
+                    "country": self.transform_country_code(address.get("country"))
                 })
                 break
 
