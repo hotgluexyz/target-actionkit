@@ -210,17 +210,18 @@ class ContactsSink(ActionKitSink):
                 break
 
         if "lists" in record and isinstance(record["lists"], list):
-
-            lists = [list_name.strip() if isinstance(list_name, str) else list_name for list_name in record["lists"]]
             
-            for list_name in lists:
+            # Leading and Trailing whitespace creates validation issues for ActionKit Lists
+            trimmed_lists = [list_name.strip() for list_name in record["lists"]]
+            
+            for list_name in trimmed_lists:
                 if list_name in self.map_list_name_to_id:
                     continue
                 self.create_list(list_name)
                 
             payload["lists"] = [
                 self.map_list_name_to_id[l]
-                for l in lists
+                for l in trimmed_lists
             ]
         if "custom_fields" in record and isinstance(record["custom_fields"], list):
             payload["fields"] = {
