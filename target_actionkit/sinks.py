@@ -210,15 +210,17 @@ class ContactsSink(ActionKitSink):
                 break
 
         if "lists" in record and isinstance(record["lists"], list):
-            # list of ids
-            for list_name in record["lists"]:
+
+            lists = [list_name.strip() if isinstance(list_name, str) else list_name for list_name in record["lists"]]
+            
+            for list_name in lists:
                 if list_name in self.map_list_name_to_id:
                     continue
                 self.create_list(list_name)
                 
             payload["lists"] = [
                 self.map_list_name_to_id[l]
-                for l in record["lists"]
+                for l in lists
             ]
         if "custom_fields" in record and isinstance(record["custom_fields"], list):
             payload["fields"] = {
