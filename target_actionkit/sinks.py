@@ -232,6 +232,6 @@ class ContactsSink(ActionKitSink):
                 if field_name in self.NON_UNIFIED_FIELDS:
                     payload[field_name] = field["value"]
                 else:
-                    payload["fields"][field["name"]] = field["value"]
+                    payload["fields"][field_name] = field["value"]
 
         return payload
