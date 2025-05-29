@@ -14,6 +14,8 @@ class ContactsSink(ActionKitSink):
     name = "Contacts"
     endpoint = "user"
     entity = "user"
+    NON_UNIFIED_FIELDS = ["source"]
+    
 
     def add_phone_numbers(self, user_id: str, record: dict):
         if "phone_numbers" in record and isinstance(record["phone_numbers"], list):
@@ -224,9 +226,13 @@ class ContactsSink(ActionKitSink):
                 for l in trimmed_lists
             ]
         if "custom_fields" in record and isinstance(record["custom_fields"], list):
-            payload["fields"] = {
-                custom_field["name"]: custom_field["value"]
-                for custom_field in record["custom_fields"]
-            }
+            for field in record["custom_fields"]:
+                field_name = field["name"].lower()
+                if field_name in self.NON_UNIFIED_FIELDS:
+                    payload[field_name] = field["value"]
+                    continue
+                else:
+                    payload["fields"] = payload.get("fields", {})
+                    payload["fields"][field["name"]] = field["value"]
 
         return payload
