@@ -226,13 +226,12 @@ class ContactsSink(ActionKitSink):
                 for l in trimmed_lists
             ]
         if "custom_fields" in record and isinstance(record["custom_fields"], list):
+            payload["fields"] = {}
             for field in record["custom_fields"]:
                 field_name = field["name"].lower()
                 if field_name in self.NON_UNIFIED_FIELDS:
                     payload[field_name] = field["value"]
-                    continue
                 else:
-                    payload["fields"] = payload.get("fields", {})
                     payload["fields"][field["name"]] = field["value"]
 
         return payload
