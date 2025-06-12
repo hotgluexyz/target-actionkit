@@ -81,3 +81,41 @@ class ActionKitSink(HotglueSink):
                 next_url = None
         
         self.map_list_name_to_id = {l["name"]: l["id"] for l in self.lists}
+
+    def find_matching_object(self, lookup_field: str, lookup_value: str):
+        """Find a matching object by any lookup field.
+        
+        Args:
+            lookup_field: The field to search on (e.g., 'email', 'id', etc.)
+            lookup_value: The value to search for
+            
+        Returns:
+            The full matching object if found, None otherwise
+        """
+        if not lookup_value:
+            return None
+
+        try:
+            if lookup_field == "id":
+                endpoint = f"{self.endpoint}/{lookup_value}"
+            else: 
+                endpoint = f"{self.endpoint}?{lookup_field}={lookup_value}"
+
+            resp = self.request_api(
+                "GET",
+                endpoint=endpoint,
+                headers=self.prepare_request_headers()
+            )
+
+            if resp.status_code == 200:
+                result = resp.json()
+                if lookup_field == "id":
+                    return result
+                else:
+                    users = result.get("objects", [])
+                    if users:
+                        return users[0]
+                    
+            return None
+        except Exception:
+            return None
