@@ -159,15 +159,27 @@ class ContactsSink(ActionKitSink):
         is_created = list_response.json().get("created_user")
         user_id = list_response.json().get("user").split("/")[-2]
 
-
         only_upsert_empty_fields = self.config.get("only_upsert_empty_fields", False)
-        if only_upsert_empty_fields and not is_created:
-            existing_user = self.find_matching_object("id", user_id)
-            if existing_user:
-                for key, value in existing_user.items():
-                    if record.get(key) is None:
-                        record[key] = value 
 
+        if only_upsert_empty_fields and not is_created:
+            endpoint = f"{self.endpoint}/{user_id}"
+            resp = self.request_api(
+                "GET",
+                endpoint=endpoint,
+                headers=self.prepare_request_headers()
+            )
+
+            existing_user = resp.json()
+            if existing_user:
+                for key, value in record.items():
+                    if key == "lists": # already handled above
+                        continue
+
+                    existing_value = existing_user.get(key)
+                    if existing_value is None:
+                        existing_user[key] = value
+
+                record = existing_user
         # Update non-email fields
         response = self.request_api(
             "PATCH",
