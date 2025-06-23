@@ -176,7 +176,7 @@ class ContactsSink(ActionKitSink):
                         continue
 
                     existing_value = existing_user.get(key)
-                    if existing_value is None:
+                    if existing_value in [None, [], ""]:
                         existing_user[key] = value
 
                 record = existing_user
