@@ -26,7 +26,9 @@ class ActionKitSink(HotglueSink):
     @property
     def base_url(self):
         if self.config.get('full_url'):
-            return f"{self.config.get('full_url')}/rest/v1/"
+            # Strip trailing slashes to prevent double slashes when concatenating
+            full_url = self.config.get('full_url').rstrip('/')
+            return f"{full_url}/rest/v1/"
             
         return f"https://{self.config.get('hostname')}.actionkit.com/rest/v1/"
     
