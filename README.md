@@ -28,15 +28,9 @@ pipx install git+https://github.com/ORG_NAME/target-actionkit.git@main
 
 ### Accepted Config Options
 
-<!--
-Developer TODO: Provide a list of config options accepted by the target.
-
-This section can be created by copy-pasting the CLI output from:
-
-```
-target-actionkit --about --format=markdown
-```
--->
+| name | default | description |
+| -----| ------- | ----------- |
+| `only_upsert_empty_fields` | `false` | If true, will not overwrite existing Contact fields in ActionKit |
 
 A full list of supported settings and capabilities for this
 target is available by running:
@@ -69,64 +63,3 @@ target-actionkit --help
 # Test using the "Carbon Intensity" sample:
 tap-carbon-intensity | target-actionkit --config /path/to/target-actionkit-config.json
 ```
-
-## Developer Resources
-
-Follow these instructions to contribute to this project.
-
-### Initialize your Development Environment
-
-```bash
-pipx install poetry
-poetry install
-```
-
-### Create and Run Tests
-
-Create tests within the `tests` subfolder and
-  then run:
-
-```bash
-poetry run pytest
-```
-
-You can also test the `target-actionkit` CLI interface directly using `poetry run`:
-
-```bash
-poetry run target-actionkit --help
-```
-
-### Testing with [Meltano](https://meltano.com/)
-
-_**Note:** This target will work in any Singer environment and does not require Meltano.
-Examples here are for convenience and to streamline end-to-end orchestration scenarios._
-
-<!--
-Developer TODO:
-Your project comes with a custom `meltano.yml` project file already created. Open the `meltano.yml` and follow any "TODO" items listed in
-the file.
--->
-
-Next, install Meltano (if you haven't already) and any needed plugins:
-
-```bash
-# Install meltano
-pipx install meltano
-# Initialize meltano within this directory
-cd target-actionkit
-meltano install
-```
-
-Now you can test and orchestrate using Meltano:
-
-```bash
-# Test invocation:
-meltano invoke target-actionkit --version
-# OR run a test `elt` pipeline with the Carbon Intensity sample tap:
-meltano run tap-carbon-intensity target-actionkit
-```
-
-### SDK Dev Guide
-
-See the [dev guide](https://sdk.meltano.com/en/latest/dev_guide.html) for more instructions on how to use the Meltano Singer SDK to
-develop your own Singer taps and targets.
