@@ -1,0 +1,8 @@
+{
+    "username": "your_actionkit_username",
+    "password": "your_actionkit_password",
+    "hostname": "your-instance",
+    "signup_page_short_name": "signup",
+    "unsubscribe_page_short_name": "unsubscribe",
+    "full_url": "https://your-instance.actionkit.com"
+}
