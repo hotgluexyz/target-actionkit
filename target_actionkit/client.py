@@ -51,10 +51,13 @@ class ActionKitSink(HotglueSink):
         if response.status_code == 400:
             try:
                 error_msg = response.json()
+                # the response can have different structures, so we need to handle them all
                 if isinstance(error_msg, dict) and "errors" in error_msg:
                     error_msg = error_msg["errors"]
-                error_msg = next(iter(error_msg.values()))
-                error_msg = error_msg[0]
+                if isinstance(error_msg, dict):
+                    error_msg = next(iter(error_msg.values()))
+                if isinstance(error_msg, list):
+                    error_msg = error_msg[0]
             except:
                 error_msg = response.text
             raise InvalidPayloadError(error_msg)
