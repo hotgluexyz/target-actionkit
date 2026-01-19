@@ -1,7 +1,8 @@
 """ActionKit target class."""
 
-from singer_sdk import typing as th
-from target_hotglue.target import TargetHotglue
+from hotglue_singer_sdk import typing as th
+from hotglue_singer_sdk.target_sdk.target import TargetHotglue
+from hotglue_singer_sdk.helpers.capabilities import AlertingLevel
 
 from target_actionkit.sinks import (
     ContactsSink,
@@ -15,6 +16,7 @@ class TargetActionKit(TargetHotglue):
         ContactsSink,
     ]
     name = "target-actionkit"
+    alerting_level = AlertingLevel.ERROR
 
     def __init__(
         self,
@@ -34,6 +36,7 @@ class TargetActionKit(TargetHotglue):
         th.Property("username", th.StringType, required=True),
         th.Property("password", th.StringType, required=True),
         th.Property("hostname", th.StringType, required=False),
+        th.Property("full_url", th.StringType, required=False),
         th.Property("signup_page_short_name", th.StringType, required=True),
         th.Property("unsubscribe_page_short_name", th.StringType, required=False),
     ).to_dict()

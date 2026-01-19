@@ -1,9 +1,10 @@
-from target_hotglue.client import HotglueSink
+from hotglue_singer_sdk.target_sdk.client import HotglueSink
 import requests
-from singer_sdk.plugin_base import PluginBase
+from hotglue_singer_sdk.plugin_base import PluginBase
 from typing import Dict, List, Optional
 import singer
-from singer_sdk.exceptions import FatalAPIError, RetriableAPIError
+from hotglue_singer_sdk.exceptions import FatalAPIError, RetriableAPIError
+from hotglue_etl_exceptions import InvalidPayloadError, InvalidCredentialsError
 from target_actionkit.auth import ActionKitAuth
 
 LOGGER = singer.get_logger()
@@ -20,8 +21,13 @@ class ActionKitSink(HotglueSink):
     ) -> None:
         super().__init__(target, stream_name, schema, key_properties)
         self.__auth = ActionKitAuth(dict(self.config))
-        self.lists = None
-        self.initialize_lists()
+        self.__map_list_name_to_id = None
+
+    @property
+    def map_list_name_to_id(self):
+        if self.__map_list_name_to_id is None:
+            self.initialize_lists()
+        return self.__map_list_name_to_id
 
     @property
     def base_url(self):
@@ -42,17 +48,43 @@ class ActionKitSink(HotglueSink):
 
     def validate_response(self, response: requests.Response) -> None:
         """Validate HTTP response."""
+        if response.status_code == 400:
+            try:
+                error_msg = response.json()
+                # the response can have different structures, so we need to handle them all
+                if isinstance(error_msg, dict) and "errors" in error_msg:
+                    error_msg = error_msg["errors"]
+                if isinstance(error_msg, dict):
+                    error_msg = next(iter(error_msg.values()))
+                if isinstance(error_msg, list):
+                    error_msg = error_msg[0]
+            except:
+                error_msg = response.text
+            raise InvalidPayloadError(error_msg)
         msg = self.response_error_message(response)
+        if response.status_code in [401, 403]:
+            if hasattr(response, "text") and response.text:
+                error_msg = response.text
+            else:
+                error_msg = msg
+            self.__auth.set_auth_error(response.request.method, response.request.url, error_msg)
+            raise InvalidCredentialsError(error_msg)
         if hasattr(response, "text") and response.text:
             msg = f"{msg}. Response: {response.text}"
-        if response.status_code in [409]:
-            msg = f"{msg}. reason: {response.reason}"
         if response.status_code in [429] or 500 <= response.status_code < 600:
             raise RetriableAPIError(msg, response)
         elif 400 <= response.status_code < 500:
             raise FatalAPIError(msg)
 
 
+    def request_api(self, http_method, endpoint=None, params={}, request_data=None, headers={}, verify=True):
+        """Request records from REST endpoint(s), returning response records."""
+        # Avoid retrying requests if we've already encountered an authentication error
+        auth_error = self.__auth.get_auth_error(http_method, self.url(endpoint))
+        if auth_error:
+            raise InvalidCredentialsError(auth_error)
+        return super().request_api(http_method, endpoint, params, request_data, headers, verify)
+    
     def prepare_request_headers(self):
         """Prepare request headers."""
         return {
@@ -62,9 +94,7 @@ class ActionKitSink(HotglueSink):
         }
     
     def initialize_lists(self):
-        if getattr(self, "lists"):
-            return
-        self.lists = []
+        lists = []
         list_url = f"list/"
         params = "?_limit=100"
         next_url = f"{list_url}{params}"
@@ -74,7 +104,7 @@ class ActionKitSink(HotglueSink):
             response = self.request_api("GET", endpoint=next_url, headers=self.prepare_request_headers())
             response_data = response.json()
             self.logger.info(f"Response: {response_data}")
-            self.lists.extend(response_data.get("objects", []))
+            lists.extend(response_data.get("objects", []))
             params: str = response_data.get("meta", {}).get("next", "")
             if params:
                 params = params.split("/")[-1]
@@ -82,4 +112,4 @@ class ActionKitSink(HotglueSink):
             else:
                 next_url = None
         
-        self.map_list_name_to_id = {l["name"]: l["id"] for l in self.lists}
+        self.__map_list_name_to_id = {l["name"]: l["id"] for l in lists}

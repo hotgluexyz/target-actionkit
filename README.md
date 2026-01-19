@@ -26,6 +26,13 @@ pipx install git+https://github.com/ORG_NAME/target-actionkit.git@main
 
 ## Configuration
 
+### Configuration Template
+
+A configuration template and detailed configuration guide are available in the [`template/`](template/) directory:
+
+- **Template file**: [`template/config.json`](template/config.json) - Copy this file and update it with your ActionKit credentials
+- **Configuration guide**: [`template/README.md`](template/README.md) - Detailed documentation of all configuration options
+
 ### Accepted Config Options
 
 <!--
