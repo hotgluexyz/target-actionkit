@@ -21,7 +21,6 @@ class ActionKitSink(HotglueSink):
     ) -> None:
         super().__init__(target, stream_name, schema, key_properties)
         self.__auth = ActionKitAuth(dict(self.config))
-        self.__auth_error: Optional[str] = None
         self.__map_list_name_to_id = None
 
     @property
@@ -62,10 +61,11 @@ class ActionKitSink(HotglueSink):
         msg = self.response_error_message(response)
         if response.status_code in [401, 403]:
             if hasattr(response, "text") and response.text:
-                self.__auth_error = response.text
+                error_msg = response.text
             else:
-                self.__auth_error = msg
-            raise InvalidCredentialsError(self.__auth_error)
+                error_msg = msg
+            self.__auth.set_auth_error(response.request.method, response.request.url, error_msg)
+            raise InvalidCredentialsError(error_msg)
         if hasattr(response, "text") and response.text:
             msg = f"{msg}. Response: {response.text}"
         if response.status_code in [429] or 500 <= response.status_code < 600:
@@ -77,8 +77,9 @@ class ActionKitSink(HotglueSink):
     def request_api(self, http_method, endpoint=None, params={}, request_data=None, headers={}, verify=True):
         """Request records from REST endpoint(s), returning response records."""
         # Avoid retrying requests if we've already encountered an authentication error
-        if self.__auth_error is not None:
-            raise InvalidCredentialsError(self.__auth_error)
+        auth_error = self.__auth.get_auth_error(http_method, self.url(endpoint))
+        if auth_error:
+            raise InvalidCredentialsError(auth_error)
         return super().request_api(http_method, endpoint, params, request_data, headers, verify)
     
     def prepare_request_headers(self):
