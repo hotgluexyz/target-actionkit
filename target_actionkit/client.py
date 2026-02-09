@@ -97,15 +97,14 @@ class ActionKitSink(HotglueSink):
             body = response.json() if response.text else None
         except Exception:
             body = None
-        if body is None:
-            resp_info = f"status={response.status_code}"
+        resp_info = f"status={response.status_code}"
+        if not body:
+            resp_info += f" body={response.text if response.text else 'empty response'}"
         else:
-            resp_info = f"status={response.status_code} keys={list(body.keys()) if isinstance(body, dict) else type(body).__name__}"
-            if isinstance(body, dict):
-                if "user" in body:
-                    resp_info += f" user={body.get('user')}"
-                if "created_user" in body:
-                    resp_info += f" created_user={body.get('created_user')}"
+            resp_info += f" keys={list(body.keys()) if isinstance(body, dict) else type(body).__name__}"
+            # log the entire body if the request was not a GET
+            if http_method != "GET":
+                resp_info += f" body={body}"
         self.logger.info(f"API response: {resp_info}")
         return response
     
