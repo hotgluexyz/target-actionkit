@@ -76,35 +76,36 @@ class ActionKitSink(HotglueSink):
         elif 400 <= response.status_code < 500:
             raise FatalAPIError(msg)
 
-
-    def request_api(self, http_method, endpoint=None, params={}, request_data=None, headers={}, verify=True):
-        """
-        Request records from REST endpoint(s), returning response records.
-        Logs the request and response information to help debugging.
-        """
-        # Avoid retrying requests if we've already encountered an authentication error
-        auth_error = self.__auth.get_auth_error(http_method, self.url(endpoint))
-        if auth_error:
-            raise InvalidCredentialsError(auth_error)
-        req_info = f"{http_method} {endpoint or ''}"
-        if params:
-            req_info += f" params={list(params.keys())}"
-        if request_data and isinstance(request_data, dict):
-            req_info += f" body_keys={list(request_data.keys())}"
-        self.logger.info(f"API request: {req_info}")
-        response = super().request_api(http_method, endpoint, params, request_data, headers, verify)
+    @staticmethod
+    def get_response_log(response: requests.Response) -> str:
+        """Short one-line summary of request + response for debugging."""
+        request = response.request
+        req_part = f"{request.method} {request.path_url or request.url}"
         try:
             body = response.json() if response.text else None
         except Exception:
             body = None
-        resp_info = f"status={response.status_code}"
-        if not body:
-            resp_info += f" body={response.text if response.text else 'empty response'}"
+        resp_part = f"status={response.status_code} "
+        if body is None:
+            resp_part += f"body={response.text[:200] if response.text else 'empty'}"
+        elif isinstance(body, dict):
+            if request.method == "GET":
+                resp_part += f"keys={list(body.keys())}"
+            else:
+                resp_part += f"body={body}"
         else:
-            resp_info += f" keys={list(body.keys()) if isinstance(body, dict) else type(body).__name__}"
-            if http_method != "GET":
-                resp_info += f" body={body}"
-        self.logger.info(f"API response: {resp_info}")
+            resp_part += f"type={type(body).__name__}"
+        return f"API Request: {req_part} -> Response {resp_part}"
+
+
+    def request_api(self, http_method, endpoint=None, params={}, request_data=None, headers={}, verify=True):
+        """Request records from REST endpoint(s), returning response records."""
+        # Avoid retrying requests if we've already encountered an authentication error
+        auth_error = self.__auth.get_auth_error(http_method, self.url(endpoint))
+        if auth_error:
+            raise InvalidCredentialsError(auth_error)
+        response = super().request_api(http_method, endpoint, params, request_data, headers, verify)
+        self.logger.info(self.get_response_log(response))
         return response
     
     def prepare_request_headers(self):
