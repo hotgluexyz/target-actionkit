@@ -76,6 +76,27 @@ class ActionKitSink(HotglueSink):
         elif 400 <= response.status_code < 500:
             raise FatalAPIError(msg)
 
+    @staticmethod
+    def get_response_log(response: requests.Response) -> str:
+        """Short one-line summary of request + response for debugging."""
+        request = response.request
+        req_part = f"{request.method} {request.path_url or request.url}"
+        try:
+            body = response.json() if response.text else None
+        except Exception:
+            body = None
+        resp_part = f"status={response.status_code} "
+        if body is None:
+            resp_part += f"body={response.text[:200] if response.text else 'empty'}"
+        elif isinstance(body, dict):
+            if request.method == "GET":
+                resp_part += f"keys={list(body.keys())}"
+            else:
+                resp_part += f"body={body}"
+        else:
+            resp_part += f"type={type(body).__name__}"
+        return f"API Request: {req_part} -> Response {resp_part}"
+
 
     def request_api(self, http_method, endpoint=None, params={}, request_data=None, headers={}, verify=True):
         """Request records from REST endpoint(s), returning response records."""
@@ -83,7 +104,9 @@ class ActionKitSink(HotglueSink):
         auth_error = self.__auth.get_auth_error(http_method, self.url(endpoint))
         if auth_error:
             raise InvalidCredentialsError(auth_error)
-        return super().request_api(http_method, endpoint, params, request_data, headers, verify)
+        response = super().request_api(http_method, endpoint, params, request_data, headers, verify)
+        self.logger.info(self.get_response_log(response))
+        return response
     
     def prepare_request_headers(self):
         """Prepare request headers."""
@@ -98,12 +121,10 @@ class ActionKitSink(HotglueSink):
         list_url = f"list/"
         params = "?_limit=100"
         next_url = f"{list_url}{params}"
-        self.logger.info(f"Fetching lists from {self.base_url}{next_url}")
 
         while next_url:
             response = self.request_api("GET", endpoint=next_url, headers=self.prepare_request_headers())
             response_data = response.json()
-            self.logger.info(f"Response: {response_data}")
             lists.extend(response_data.get("objects", []))
             params: str = response_data.get("meta", {}).get("next", "")
             if params:
