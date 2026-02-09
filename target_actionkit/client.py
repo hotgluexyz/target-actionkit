@@ -102,7 +102,6 @@ class ActionKitSink(HotglueSink):
             resp_info += f" body={response.text if response.text else 'empty response'}"
         else:
             resp_info += f" keys={list(body.keys()) if isinstance(body, dict) else type(body).__name__}"
-            # log the entire body if the request was not a GET
             if http_method != "GET":
                 resp_info += f" body={body}"
         self.logger.info(f"API response: {resp_info}")
