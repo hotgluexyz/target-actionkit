@@ -78,12 +78,36 @@ class ActionKitSink(HotglueSink):
 
 
     def request_api(self, http_method, endpoint=None, params={}, request_data=None, headers={}, verify=True):
-        """Request records from REST endpoint(s), returning response records."""
+        """
+        Request records from REST endpoint(s), returning response records.
+        Logs the request and response information to help debugging.
+        """
         # Avoid retrying requests if we've already encountered an authentication error
         auth_error = self.__auth.get_auth_error(http_method, self.url(endpoint))
         if auth_error:
             raise InvalidCredentialsError(auth_error)
-        return super().request_api(http_method, endpoint, params, request_data, headers, verify)
+        req_info = f"{http_method} {endpoint or ''}"
+        if params:
+            req_info += f" params={list(params.keys())}"
+        if request_data and isinstance(request_data, dict):
+            req_info += f" body_keys={list(request_data.keys())}"
+        self.logger.info(f"API request: {req_info}")
+        response = super().request_api(http_method, endpoint, params, request_data, headers, verify)
+        try:
+            body = response.json() if response.text else None
+        except Exception:
+            body = None
+        if body is None:
+            resp_info = f"status={response.status_code}"
+        else:
+            resp_info = f"status={response.status_code} keys={list(body.keys()) if isinstance(body, dict) else type(body).__name__}"
+            if isinstance(body, dict):
+                if "user" in body:
+                    resp_info += f" user={body.get('user')}"
+                if "created_user" in body:
+                    resp_info += f" created_user={body.get('created_user')}"
+        self.logger.info(f"API response: {resp_info}")
+        return response
     
     def prepare_request_headers(self):
         """Prepare request headers."""
@@ -98,12 +122,10 @@ class ActionKitSink(HotglueSink):
         list_url = f"list/"
         params = "?_limit=100"
         next_url = f"{list_url}{params}"
-        self.logger.info(f"Fetching lists from {self.base_url}{next_url}")
 
         while next_url:
             response = self.request_api("GET", endpoint=next_url, headers=self.prepare_request_headers())
             response_data = response.json()
-            self.logger.info(f"Response: {response_data}")
             lists.extend(response_data.get("objects", []))
             params: str = response_data.get("meta", {}).get("next", "")
             if params:
