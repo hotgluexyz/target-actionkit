@@ -71,7 +71,7 @@ class ContactsSink(ActionKitSink):
     def post_signup_action(self, user_email: str, lists: list = None):
         
         self.logger.info(f"Signup user: {user_email}. lists: {lists}")
-        resp =  self.request_api(
+        resp = self.request_api(
             "POST",
             request_data={
                 "email": user_email,
@@ -81,7 +81,6 @@ class ContactsSink(ActionKitSink):
             endpoint="action",
             headers=self.prepare_request_headers()
         )
-        self.logger.info(f"Signup result: {resp.status_code}")
         return resp
     
     def remove_lists(self, user_email: str):
@@ -156,8 +155,15 @@ class ContactsSink(ActionKitSink):
             # Create if not exists without lists
             list_response = self.post_signup_action(record["email"])
 
-        is_created = list_response.json().get("created_user")
-        user_id = list_response.json().get("user").split("/")[-2]
+        response_json = list_response.json()
+        is_created = response_json.get("created_user", False)
+        # the response can have different structures depending on the Authentication
+        if "user" in response_json:
+            user_id = response_json.get("user").split("/")[-2]
+        elif "akid" in response_json:
+            user_id = response_json.get("akid").split(".")[-2]
+        else:
+            raise Exception(f"No user ID found in Signup response: {response_json}")
 
         # Update non-email fields
         response = self.request_api(

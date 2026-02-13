@@ -89,10 +89,7 @@ class ActionKitSink(HotglueSink):
         if body is None:
             resp_part += f"body={response.text[:200] if response.text else 'empty'}"
         elif isinstance(body, dict):
-            if request.method == "GET":
-                resp_part += f"keys={list(body.keys())}"
-            else:
-                resp_part += f"body={body}"
+            resp_part += f"keys={list(body.keys())}"
         else:
             resp_part += f"type={type(body).__name__}"
         return f"API Request: {req_part} -> Response {resp_part}"
