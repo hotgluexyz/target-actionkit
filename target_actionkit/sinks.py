@@ -128,7 +128,7 @@ class ContactsSink(ActionKitSink):
         intended_unsubscribe = subscribe_status == "unsubscribed"
         intended_subscribe = subscribe_status == "subscribed"
         
-        lists = record.get("lists")
+        lists = record.get("lists") or []
 
 
         # Unsubscribe user from all lists because API does not support unsubscribing from single lists
